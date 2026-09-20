@@ -101,3 +101,21 @@ export function getStatusColor(status: StatusAtestado): {
       };
   }
 }
+
+/**
+ * Verifica se um usuário possui o perfil "Equipe de Gestão de RH" (permissão de gestão)
+ */
+export function isPerfilGestorRH(user?: {
+  perfil?: string;
+  nome?: string;
+  matricula?: string;
+  login?: string;
+} | null): boolean {
+  if (!user) return false;
+  if (user.perfil === 'Equipe de Gestão de RH') return true;
+  const nomeNorm = user.nome?.trim().toLowerCase();
+  if (nomeNorm === 'equipe de gestão de rh' || nomeNorm === 'equipe de gestao de rh') return true;
+  if (user.matricula?.trim().toUpperCase() === 'RH-001') return true;
+  if (user.login?.trim().toLowerCase() === 'rh@katoennatie.com') return true;
+  return false;
+}

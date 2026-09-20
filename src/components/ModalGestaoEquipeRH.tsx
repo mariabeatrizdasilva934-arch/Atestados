@@ -14,13 +14,15 @@ import {
   Hash,
   Briefcase,
   User,
+  Lock,
   Eye,
   EyeOff,
   RefreshCw
 } from 'lucide-react';
-import { MembroRH, RHUser } from '../types';
-import { formatarDataHora } from '../utils/formatters';
+import { MembroRH, RHUser, PerfilRH } from '../types';
+import { formatarDataHora, isPerfilGestorRH } from '../utils/formatters';
 import { api } from '../utils/apiClient';
+import { ModalAlterarSenhaRH } from './ModalAlterarSenhaRH';
 
 interface ModalGestaoEquipeRHProps {
   isOpen: boolean;
@@ -54,7 +56,12 @@ export function ModalGestaoEquipeRH({
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [ativo, setAtivo] = useState(true);
+  const [perfil, setPerfil] = useState<PerfilRH>('Integrante da Equipe');
   const [mostrarSenha, setMostrarSenha] = useState(false);
+
+  // Modal de Alteração de Senha
+  const [modalSenhaAberto, setModalSenhaAberto] = useState(false);
+  const [membroParaSenha, setMembroParaSenha] = useState<MembroRH | null>(null);
 
   // Confirmação de exclusão
   const [membroParaExcluir, setMembroParaExcluir] = useState<MembroRH | null>(null);
@@ -79,6 +86,8 @@ export function ModalGestaoEquipeRH({
       setSucessoMsg(null);
       setFormAberto(false);
       setMembroParaExcluir(null);
+      setModalSenhaAberto(false);
+      setMembroParaSenha(null);
     }
   }, [isOpen]);
 
@@ -92,6 +101,7 @@ export function ModalGestaoEquipeRH({
     setSenha('');
     setConfirmarSenha('');
     setAtivo(true);
+    setPerfil('Integrante da Equipe');
     setMostrarSenha(false);
     setErro(null);
     setSucessoMsg(null);
@@ -108,10 +118,31 @@ export function ModalGestaoEquipeRH({
     setSenha('');
     setConfirmarSenha('');
     setAtivo(m.ativo);
+    setPerfil(m.perfil || (isPerfilGestorRH(m) ? 'Equipe de Gestão de RH' : 'Integrante da Equipe'));
     setMostrarSenha(false);
     setErro(null);
     setSucessoMsg(null);
     setFormAberto(true);
+  };
+
+  const abrirModalSenha = (m: MembroRH) => {
+    setMembroParaSenha(m);
+    setModalSenhaAberto(true);
+  };
+
+  const handleSenhaAlterada = (membroId: string, registro?: { alteradoEm?: string; alteradoPor?: string }) => {
+    setEquipe(prev =>
+      prev.map(m =>
+        m.id === membroId
+          ? {
+              ...m,
+              senhaAlteradaEm: registro?.alteradoEm || new Date().toISOString(),
+              senhaAlteradaPor: registro?.alteradoPor || 'Atualizado'
+            }
+          : m
+      )
+    );
+    setSucessoMsg('Senha atualizada com sucesso! O acesso do integrante foi atualizado imediatamente.');
   };
 
   const fecharFormulario = () => {
@@ -174,6 +205,7 @@ export function ModalGestaoEquipeRH({
         cargo: cargo.trim() || 'Gestão de Recursos Humanos',
         login: login.trim().toLowerCase(),
         email: email.trim() || login.trim().toLowerCase(),
+        perfil: perfil || 'Integrante da Equipe',
         ativo
       };
 
@@ -200,7 +232,8 @@ export function ModalGestaoEquipeRH({
             matricula: data.membro.matricula,
             cargo: data.membro.cargo,
             email: data.membro.email,
-            login: data.membro.login
+            login: data.membro.login,
+            perfil: data.membro.perfil
           });
         }
       }
@@ -232,6 +265,25 @@ export function ModalGestaoEquipeRH({
       setExcluindoId(null);
     }
   };
+
+  const membroUsuarioLogado = useMemo(() => {
+    if (!usuarioLogado) return null;
+    return (
+      equipe.find(
+        m =>
+          m.id === usuarioLogado.id ||
+          (usuarioLogado.matricula && m.matricula.toUpperCase() === usuarioLogado.matricula.toUpperCase()) ||
+          (usuarioLogado.login && m.login.toLowerCase() === usuarioLogado.login.toLowerCase())
+      ) || null
+    );
+  }, [equipe, usuarioLogado]);
+
+  const membroEditando = useMemo(() => {
+    if (!editandoId) return null;
+    return equipe.find(m => m.id === editandoId) || null;
+  }, [equipe, editandoId]);
+
+  const ehGestorRH = isPerfilGestorRH(usuarioLogado);
 
   const equipeFiltrada = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -449,53 +501,131 @@ export function ModalGestaoEquipeRH({
                   </div>
                 </div>
 
-                {/* Senha e Confirmação */}
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <KeyRound className="w-3.5 h-3.5 text-red-600" />
-                      Credenciais de Senha {editandoId ? '(Preencha apenas para alterar)' : ''}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setMostrarSenha(!mostrarSenha)}
-                      className="text-xs text-slate-600 hover:text-red-700 flex items-center gap-1 cursor-pointer font-medium"
-                    >
-                      {mostrarSenha ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      <span>{mostrarSenha ? 'Ocultar' : 'Exibir'} senha</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">
-                        {editandoId ? 'Nova Senha (opcional)' : 'Senha de Acesso'} {!editandoId && <span className="text-red-500">*</span>}
-                      </label>
-                      <input
-                        type={mostrarSenha ? 'text' : 'password'}
-                        required={!editandoId}
-                        value={senha}
-                        onChange={e => setSenha(e.target.value)}
-                        placeholder={editandoId ? 'Manter a senha atual' : 'Mínimo 3 caracteres'}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-red-600/20 focus:border-red-600"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">
-                        Confirmar {editandoId ? 'Nova Senha' : 'Senha'} {!editandoId && <span className="text-red-500">*</span>}
-                      </label>
-                      <input
-                        type={mostrarSenha ? 'text' : 'password'}
-                        required={!editandoId || !!senha.trim()}
-                        value={confirmarSenha}
-                        onChange={e => setConfirmarSenha(e.target.value)}
-                        placeholder="Repita a senha digitada"
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-red-600/20 focus:border-red-600"
-                      />
-                    </div>
-                  </div>
+                {/* Perfil na Equipe de RH */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Perfil de Acesso no RH <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={perfil}
+                    onChange={e => setPerfil(e.target.value as PerfilRH)}
+                    disabled={editandoId ? (!ehGestorRH && matricula === 'RH-001') : false}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-red-600/20 focus:border-red-600"
+                  >
+                    <option value="Integrante da Equipe">Integrante da Equipe (Altera a própria senha)</option>
+                    <option value="Equipe de Gestão de RH">Equipe de Gestão de RH (Permissão para gerenciar e definir senhas da equipe)</option>
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    {perfil === 'Equipe de Gestão de RH'
+                      ? 'Integrantes com este perfil têm autorização exclusiva para definir e alterar as senhas de qualquer integrante da equipe de RH.'
+                      : 'Integrantes comuns têm permissão para alterar apenas a sua própria senha de acesso.'}
+                  </p>
                 </div>
+
+                {/* Senha e Credenciais de Acesso */}
+                {!editandoId ? (
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5 text-red-600" />
+                        Senha Inicial de Acesso <span className="text-red-500">*</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setMostrarSenha(!mostrarSenha)}
+                        className="text-xs text-slate-600 hover:text-red-700 flex items-center gap-1 cursor-pointer font-medium"
+                      >
+                        {mostrarSenha ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <span>{mostrarSenha ? 'Ocultar' : 'Exibir'} senha</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Senha de Acesso <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type={mostrarSenha ? 'text' : 'password'}
+                          required
+                          value={senha}
+                          onChange={e => setSenha(e.target.value)}
+                          placeholder="Mínimo 3 caracteres"
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-red-600/20 focus:border-red-600 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Confirmar Senha <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type={mostrarSenha ? 'text' : 'password'}
+                          required
+                          value={confirmarSenha}
+                          onChange={e => setConfirmarSenha(e.target.value)}
+                          placeholder="Repita a senha digitada"
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-red-600/20 focus:border-red-600 font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0 mt-0.5">
+                        <KeyRound className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block">Gerenciamento de Senha de Acesso</span>
+                        <span className="text-[11px] text-slate-600 block mt-0.5">
+                          {membroEditando && (
+                            usuarioLogado &&
+                            (usuarioLogado.id === membroEditando.id ||
+                              usuarioLogado.matricula === membroEditando.matricula ||
+                              usuarioLogado.login.toLowerCase() === membroEditando.login.toLowerCase())
+                              ? 'Você está editando sua própria conta. É possível alterar sua senha confirmando sua senha atual.'
+                              : ehGestorRH
+                              ? 'Como usuário do perfil Equipe de Gestão de RH, você possui autorização para definir uma nova senha para este integrante.'
+                              : 'Apenas a Equipe de Gestão de RH possui autorização para alterar a senha de outros integrantes.'
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    {membroEditando && (
+                      <div className="shrink-0">
+                        {((usuarioLogado &&
+                          (usuarioLogado.id === membroEditando.id ||
+                            usuarioLogado.matricula === membroEditando.matricula ||
+                            usuarioLogado.login.toLowerCase() === membroEditando.login.toLowerCase())) ||
+                          ehGestorRH) ? (
+                          <button
+                            type="button"
+                            id="btn-form-abrir-alterar-senha"
+                            onClick={() => abrirModalSenha(membroEditando)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors cursor-pointer shadow-xs"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>
+                              {usuarioLogado &&
+                              (usuarioLogado.id === membroEditando.id ||
+                                usuarioLogado.matricula === membroEditando.matricula ||
+                                usuarioLogado.login.toLowerCase() === membroEditando.login.toLowerCase())
+                                ? 'Alterar Minha Senha'
+                                : 'Definir Senha'}
+                            </span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-100 border border-slate-200 rounded-xl select-none">
+                            <Lock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Alteração Protegida</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Status Ativo / Inativo */}
                 <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -549,7 +679,53 @@ export function ModalGestaoEquipeRH({
             </div>
           ) : (
             /* LISTAGEM DOS INTEGRANTES DA EQUIPE */
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Banner de Perfil e Permissão de Senhas do Usuário Logado */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                      ehGestorRH ? 'bg-red-600 text-white shadow-xs' : 'bg-slate-800 text-white'
+                    }`}
+                  >
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-900">
+                        Seu Perfil Atual: {ehGestorRH ? 'Equipe de Gestão de RH' : 'Integrante da Equipe'}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          ehGestorRH
+                            ? 'bg-red-100 text-red-800 border border-red-200'
+                            : 'bg-slate-200 text-slate-700 border border-slate-300'
+                        }`}
+                      >
+                        {ehGestorRH ? 'Permissão Exclusiva de Gestão' : 'Alteração Própria de Senha'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-1">
+                      {ehGestorRH
+                        ? 'Você possui permissão exclusiva para definir/alterar a senha de qualquer integrante da equipe de RH e também alterar sua própria senha.'
+                        : 'Você pode alterar sua própria senha (com confirmação da senha atual). Apenas o perfil Equipe de Gestão de RH pode alterar a senha de outros integrantes.'}
+                    </p>
+                  </div>
+                </div>
+
+                {membroUsuarioLogado && (
+                  <button
+                    id="btn-banner-alterar-propria-senha"
+                    type="button"
+                    onClick={() => abrirModalSenha(membroUsuarioLogado)}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-bold text-red-700 bg-red-100/80 hover:bg-red-200 border border-red-300 rounded-xl transition-all cursor-pointer shrink-0 shadow-2xs"
+                  >
+                    <KeyRound className="w-3.5 h-3.5 text-red-600" />
+                    <span>Alterar Minha Senha</span>
+                  </button>
+                )}
+              </div>
+
               {carregando ? (
                 <div className="text-center py-12">
                   <RefreshCw className="w-8 h-8 text-red-600 animate-spin mx-auto mb-3" />
@@ -579,6 +755,12 @@ export function ModalGestaoEquipeRH({
                       (usuarioLogado.id === membro.id ||
                         usuarioLogado.matricula === membro.matricula ||
                         usuarioLogado.login.toLowerCase() === membro.login.toLowerCase());
+
+                    const membroEhGestor =
+                      membro.perfil === 'Equipe de Gestão de RH' ||
+                      membro.matricula === 'RH-001' ||
+                      membro.nome.trim().toLowerCase() === 'equipe de gestão de rh' ||
+                      membro.nome.trim().toLowerCase() === 'equipe de gestao de rh';
 
                     // Gerar iniciais para o avatar
                     const partesNome = membro.nome.trim().split(' ');
@@ -613,6 +795,19 @@ export function ModalGestaoEquipeRH({
                                 {membro.matricula}
                               </span>
 
+                              {/* Badge de Perfil no RH */}
+                              {membroEhGestor ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100/90 border border-red-200 px-2 py-0.5 rounded-full">
+                                  <ShieldCheck className="w-3 h-3" />
+                                  Gestão de RH
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                                  <User className="w-3 h-3 text-slate-500" />
+                                  Integrante
+                                </span>
+                              )}
+
                               {/* Badge de Você se for o logado */}
                               {ehUsuarioLogado && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white px-2 py-0.5 rounded-full">
@@ -644,22 +839,63 @@ export function ModalGestaoEquipeRH({
                                 <Mail className="w-3.5 h-3.5 text-slate-400" />
                                 {membro.login}
                               </span>
-                              {membro.criadoEm && (
+                              {membro.senhaAlteradaEm ? (
+                                <span
+                                  className="text-[11px] text-slate-600 flex items-center gap-1"
+                                  title={`Senha alterada por: ${membro.senhaAlteradaPor || 'Sistema'}`}
+                                >
+                                  <KeyRound className="w-3 h-3 text-slate-400" />
+                                  Senha atualizada em {formatarDataHora(membro.senhaAlteradaEm)}
+                                </span>
+                              ) : membro.criadoEm ? (
                                 <span className="text-[11px] text-slate-600 hidden md:inline">
                                   Cadastrado em {formatarDataHora(membro.criadoEm)}
                                 </span>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         </div>
 
-                        {/* Ações: Editar e Excluir */}
-                        <div className="flex items-center gap-2 self-end sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 w-full sm:w-auto justify-end">
+                        {/* Ações: Alterar Senha, Editar e Excluir */}
+                        <div className="flex items-center gap-2 self-end sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 w-full sm:w-auto justify-end flex-wrap">
+                          {/* Botão de Senha de acordo com perfil */}
+                          {ehUsuarioLogado ? (
+                            <button
+                              id={`btn-alterar-senha-${membro.id}`}
+                              type="button"
+                              onClick={() => abrirModalSenha(membro)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-red-700 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors cursor-pointer"
+                              title="Alterar sua própria senha (requer confirmação da senha atual)"
+                            >
+                              <KeyRound className="w-3.5 h-3.5 text-red-600" />
+                              <span>Alterar Senha</span>
+                            </button>
+                          ) : ehGestorRH ? (
+                            <button
+                              id={`btn-definir-senha-${membro.id}`}
+                              type="button"
+                              onClick={() => abrirModalSenha(membro)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                              title="Definir nova senha para este integrante (Permissão Exclusiva de Gestão de RH)"
+                            >
+                              <KeyRound className="w-3.5 h-3.5 text-slate-600" />
+                              <span>Definir Senha</span>
+                            </button>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-200 rounded-lg select-none cursor-not-allowed"
+                              title="Apenas o perfil 'Equipe de Gestão de RH' possui autorização para alterar a senha de outros integrantes."
+                            >
+                              <Lock className="w-3 h-3 text-slate-300" />
+                              <span className="hidden sm:inline">Protegido</span>
+                            </span>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => abrirEditar(membro)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                            title="Editar informações ou redefinir senha"
+                            title="Editar informações do integrante"
                           >
                             <Edit3 className="w-3.5 h-3.5 text-slate-600" />
                             <span>Editar</span>
@@ -751,6 +987,18 @@ export function ModalGestaoEquipeRH({
             </div>
           </div>
         )}
+
+        {/* Modal de Alteração / Redefinição de Senha */}
+        <ModalAlterarSenhaRH
+          isOpen={modalSenhaAberto}
+          onClose={() => {
+            setModalSenhaAberto(false);
+            setMembroParaSenha(null);
+          }}
+          targetMembro={membroParaSenha}
+          usuarioLogado={usuarioLogado}
+          onSenhaAlterada={handleSenhaAlterada}
+        />
       </div>
     </div>
   );

@@ -54,7 +54,8 @@
       "senha": "rh123",
       "codigoRecuperacao": "KATOEN-RH-2026",
       "criadoEm": "2026-09-01T00:00:00.000Z",
-      "ativo": true
+      "ativo": true,
+      "perfil": "Equipe de Gestão de RH"
     },
     {
       "id": "rh-2",
@@ -66,7 +67,8 @@
       "senha": "rh123",
       "codigoRecuperacao": "KATOEN-RH-2026",
       "criadoEm": "2026-09-01T00:00:00.000Z",
-      "ativo": true
+      "ativo": true,
+      "perfil": "Integrante da Equipe"
     }
   ]
 }

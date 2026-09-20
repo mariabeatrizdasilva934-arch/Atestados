@@ -76,6 +76,8 @@ export interface ColaboradorUser {
   role: 'colaborador';
 }
 
+export type PerfilRH = 'Equipe de Gestão de RH' | 'Integrante da Equipe';
+
 export interface RHUser {
   id?: string;
   login: string;
@@ -84,6 +86,7 @@ export interface RHUser {
   cargo?: string;
   email?: string;
   role: 'rh';
+  perfil?: PerfilRH;
 }
 
 export interface MembroRH {
@@ -95,4 +98,7 @@ export interface MembroRH {
   email: string;
   criadoEm: string;
   ativo: boolean;
+  perfil?: PerfilRH;
+  senhaAlteradaEm?: string;
+  senhaAlteradaPor?: string;
 }

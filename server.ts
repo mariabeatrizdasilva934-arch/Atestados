@@ -99,6 +99,19 @@ interface UsuarioRHRecord {
   codigoRecuperacao?: string;
   criadoEm: string;
   ativo?: boolean;
+  perfil?: 'Equipe de Gestão de RH' | 'Integrante da Equipe';
+  senhaAlteradaEm?: string;
+  senhaAlteradaPor?: string;
+}
+
+function isGestorRH(user?: { perfil?: string; nome?: string; matricula?: string; login?: string } | null): boolean {
+  if (!user) return false;
+  if (user.perfil === 'Equipe de Gestão de RH') return true;
+  const nomeNorm = user.nome?.trim().toLowerCase();
+  if (nomeNorm === 'equipe de gestão de rh' || nomeNorm === 'equipe de gestao de rh') return true;
+  if (user.matricula?.trim().toUpperCase() === 'RH-001') return true;
+  if (user.login?.trim().toLowerCase() === 'rh@katoennatie.com') return true;
+  return false;
 }
 
 interface UsersDatabase {
@@ -149,7 +162,8 @@ function generateInitialUsers(): UsersDatabase {
         senha: 'rh123',
         codigoRecuperacao: 'KATOEN-RH-2026',
         criadoEm: '2026-09-01T00:00:00.000Z',
-        ativo: true
+        ativo: true,
+        perfil: 'Equipe de Gestão de RH'
       },
       {
         id: 'rh-2',
@@ -161,7 +175,8 @@ function generateInitialUsers(): UsersDatabase {
         senha: 'rh123',
         codigoRecuperacao: 'KATOEN-RH-2026',
         criadoEm: '2026-09-01T00:00:00.000Z',
-        ativo: true
+        ativo: true,
+        perfil: 'Integrante da Equipe'
       }
     ]
   };
@@ -200,6 +215,10 @@ function readUsuarios(): UsersDatabase {
         }
         if (item.ativo === undefined) {
           item.ativo = true;
+          modificado = true;
+        }
+        if (!item.perfil) {
+          item.perfil = isGestorRH(item) ? 'Equipe de Gestão de RH' : 'Integrante da Equipe';
           modificado = true;
         }
         return item;
@@ -622,7 +641,8 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
           matricula: rhUser.matricula,
           cargo: rhUser.cargo || 'Gestão de Recursos Humanos',
           email: rhUser.email || rhUser.login,
-          role: 'rh'
+          role: 'rh',
+          perfil: rhUser.perfil || (isGestorRH(rhUser) ? 'Equipe de Gestão de RH' : 'Integrante da Equipe')
         }
       });
     } catch (err) {
@@ -690,7 +710,10 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         login: r.login,
         email: r.email || r.login,
         criadoEm: r.criadoEm,
-        ativo: r.ativo !== false
+        ativo: r.ativo !== false,
+        perfil: r.perfil || (isGestorRH(r) ? 'Equipe de Gestão de RH' : 'Integrante da Equipe'),
+        senhaAlteradaEm: r.senhaAlteradaEm,
+        senhaAlteradaPor: r.senhaAlteradaPor
       }));
       res.json(equipe);
     } catch (err) {
@@ -702,7 +725,7 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
   // API: RH - Adicionar Nova Pessoa à Equipe de Gestão de RH
   app.post('/api/rh/equipe', (req, res) => {
     try {
-      const { matricula, nome, cargo, login, email, senha } = req.body;
+      const { matricula, nome, cargo, login, email, senha, perfil } = req.body;
 
       if (!nome || typeof nome !== 'string' || !nome.trim()) {
         return res.status(400).json({ error: 'Nome completo é obrigatório.' });
@@ -738,6 +761,9 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         });
       }
 
+      const perfilFinal: 'Equipe de Gestão de RH' | 'Integrante da Equipe' =
+        perfil === 'Equipe de Gestão de RH' ? 'Equipe de Gestão de RH' : 'Integrante da Equipe';
+
       const novoMembro: UsuarioRHRecord = {
         id: `rh-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         matricula: cleanMatricula,
@@ -748,7 +774,8 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         senha: senha.trim(),
         codigoRecuperacao: 'KATOEN-RH-2026',
         criadoEm: new Date().toISOString(),
-        ativo: true
+        ativo: true,
+        perfil: perfilFinal
       };
 
       db.rh.push(novoMembro);
@@ -765,7 +792,8 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
           login: novoMembro.login,
           email: novoMembro.email,
           criadoEm: novoMembro.criadoEm,
-          ativo: novoMembro.ativo
+          ativo: novoMembro.ativo,
+          perfil: novoMembro.perfil
         }
       });
     } catch (err) {
@@ -778,7 +806,7 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
   app.put('/api/rh/equipe/:id', (req, res) => {
     try {
       const { id } = req.params;
-      const { matricula, nome, cargo, login, email, senha, ativo } = req.body;
+      const { matricula, nome, cargo, login, email, senha, ativo, perfil } = req.body;
 
       const db = readUsuarios();
       const index = db.rh.findIndex(r => r.id === id);
@@ -809,8 +837,13 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       if (cargo && cargo.trim()) db.rh[index].cargo = cargo.trim();
       if (login && login.trim()) db.rh[index].login = cleanLogin;
       if (email && email.trim()) db.rh[index].email = cleanEmail;
+      if (perfil && (perfil === 'Equipe de Gestão de RH' || perfil === 'Integrante da Equipe')) {
+        db.rh[index].perfil = perfil;
+      }
       if (senha && typeof senha === 'string' && senha.trim().length >= 3) {
         db.rh[index].senha = senha.trim();
+        db.rh[index].senhaAlteradaEm = new Date().toISOString();
+        db.rh[index].senhaAlteradaPor = 'Edição administrativa';
       }
 
       if (typeof ativo === 'boolean') {
@@ -838,7 +871,10 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
           login: db.rh[index].login,
           email: db.rh[index].email,
           criadoEm: db.rh[index].criadoEm,
-          ativo: db.rh[index].ativo !== false
+          ativo: db.rh[index].ativo !== false,
+          perfil: db.rh[index].perfil || (isGestorRH(db.rh[index]) ? 'Equipe de Gestão de RH' : 'Integrante da Equipe'),
+          senhaAlteradaEm: db.rh[index].senhaAlteradaEm,
+          senhaAlteradaPor: db.rh[index].senhaAlteradaPor
         }
       });
     } catch (err) {
@@ -846,6 +882,119 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       res.status(500).json({ error: 'Erro ao atualizar dados do integrante.' });
     }
   });
+
+  // API: RH - Alteração de Senha com Controle de Permissão Estrita
+  const handleAlterarSenhaRH = (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const {
+        solicitanteId,
+        solicitanteLogin,
+        solicitanteMatricula,
+        senhaAtual,
+        novaSenha
+      } = req.body;
+
+      if (!novaSenha || typeof novaSenha !== 'string' || novaSenha.trim().length < 3) {
+        return res.status(400).json({ error: 'A nova senha deve ter no mínimo 3 caracteres.' });
+      }
+
+      const db = readUsuarios();
+      const targetIndex = db.rh.findIndex(r => r.id === id);
+      if (targetIndex === -1) {
+        return res.status(404).json({ error: 'Integrante de RH não encontrado.' });
+      }
+
+      const target = db.rh[targetIndex];
+
+      // Identificar o usuário solicitante da ação
+      const solicitante = db.rh.find(
+        r =>
+          (solicitanteId && r.id === solicitanteId) ||
+          (solicitanteLogin && r.login.toLowerCase() === String(solicitanteLogin).trim().toLowerCase()) ||
+          (solicitanteMatricula && r.matricula.toUpperCase() === String(solicitanteMatricula).trim().toUpperCase())
+      );
+
+      if (!solicitante) {
+        return res.status(401).json({
+          error: 'Usuário solicitante não identificado. Faça login na área de RH.'
+        });
+      }
+
+      if (solicitante.ativo === false) {
+        return res.status(403).json({
+          error: 'Acesso bloqueado. Seu usuário de RH está desativado.'
+        });
+      }
+
+      const isSelf =
+        target.id === solicitante.id ||
+        target.login.toLowerCase() === solicitante.login.toLowerCase() ||
+        target.matricula.toUpperCase() === solicitante.matricula.toUpperCase();
+
+      const ehGestor = isGestorRH(solicitante);
+
+      // CASO 1: O usuário está alterando a PRÓPRIA senha
+      if (isSelf) {
+        if (!senhaAtual || typeof senhaAtual !== 'string' || !senhaAtual.trim()) {
+          return res.status(400).json({
+            error: 'Para alterar sua própria senha, informe sua senha atual para confirmação.'
+          });
+        }
+
+        if (target.senha !== senhaAtual.trim()) {
+          return res.status(400).json({
+            error: 'A senha atual informada está incorreta. Verifique suas credenciais.'
+          });
+        }
+
+        target.senha = novaSenha.trim();
+        target.senhaAlteradaEm = new Date().toISOString();
+        target.senhaAlteradaPor = 'Próprio usuário';
+        db.rh[targetIndex] = target;
+        writeUsuarios(db);
+
+        return res.json({
+          success: true,
+          message: 'Sua senha foi alterada com sucesso! O novo acesso já está ativo imediatamente.',
+          registro: {
+            alteradoEm: target.senhaAlteradaEm,
+            alteradoPor: target.senhaAlteradaPor
+          }
+        });
+      }
+
+      // CASO 2: Tentando alterar senha de OUTRO integrante
+      // REGRA: Apenas usuário com perfil "Equipe de Gestão de RH" possui permissão
+      if (!ehGestor) {
+        return res.status(403).json({
+          error: 'Permissão negada. Apenas usuários com perfil "Equipe de Gestão de RH" possuem permissão para alterar a senha de outros integrantes.'
+        });
+      }
+
+      // Gestor de RH alterando a senha de um integrante:
+      target.senha = novaSenha.trim();
+      target.senhaAlteradaEm = new Date().toISOString();
+      target.senhaAlteradaPor = `${solicitante.nome} (Equipe de Gestão de RH)`;
+      db.rh[targetIndex] = target;
+      writeUsuarios(db);
+
+      return res.json({
+        success: true,
+        message: `A senha de ${target.nome} foi redefinida com sucesso pela Equipe de Gestão de RH! O novo acesso já está ativo imediatamente.`,
+        registro: {
+          alteradoEm: target.senhaAlteradaEm,
+          alteradoPor: target.senhaAlteradaPor
+        }
+      });
+    } catch (err) {
+      console.error('Erro ao alterar senha do integrante de RH:', err);
+      res.status(500).json({ error: 'Erro interno ao processar alteração de senha.' });
+    }
+  };
+
+  app.post('/api/rh/equipe/:id/alterar-senha', handleAlterarSenhaRH);
+  app.patch('/api/rh/equipe/:id/senha', handleAlterarSenhaRH);
 
   // API: RH - Remover Integrante da Equipe de Gestão de RH
   app.delete('/api/rh/equipe/:id', (req, res) => {
