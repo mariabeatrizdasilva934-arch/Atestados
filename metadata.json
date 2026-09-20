@@ -1,0 +1,6 @@
+{
+  "name": "Envio de Atestados",
+  "description": "Aplicativo corporativo seguro Katoen Natie para envio de atestados médicos e declarações ao Recursos Humanos (RH).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

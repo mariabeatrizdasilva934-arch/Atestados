@@ -1,0 +1,72 @@
+{
+  "colaboradores": [
+    {
+      "matricula": "MAT-10482",
+      "nomeCompleto": "Carlos Eduardo Santos",
+      "setor": "Ensaque",
+      "senha": "123",
+      "criadoEm": "2026-09-15T08:00:00.000Z"
+    },
+    {
+      "matricula": "MAT-12903",
+      "nomeCompleto": "Juliana Oliveira Costa",
+      "setor": "Administrativo",
+      "senha": "123",
+      "criadoEm": "2026-09-16T08:00:00.000Z"
+    },
+    {
+      "matricula": "MAT-09831",
+      "nomeCompleto": "Marcos Vinicius Pereira",
+      "setor": "Expedição",
+      "senha": "123",
+      "criadoEm": "2026-09-17T08:00:00.000Z"
+    },
+    {
+      "matricula": "MAT-14120",
+      "nomeCompleto": "Fernanda Rocha Lima",
+      "setor": "Manutenção",
+      "senha": "123",
+      "criadoEm": "2026-09-18T07:00:00.000Z"
+    },
+    {
+      "matricula": "MAT-20001",
+      "nomeCompleto": "Roberto Albuquerque",
+      "setor": "Manutenção",
+      "senha": "321",
+      "criadoEm": "2026-09-19T11:52:11.074Z"
+    },
+    {
+      "matricula": "10109960",
+      "nomeCompleto": "maria beatriz",
+      "setor": "Administrativo",
+      "senha": "152025",
+      "criadoEm": "2026-09-19T12:06:44.022Z"
+    }
+  ],
+  "rh": [
+    {
+      "id": "rh-1",
+      "matricula": "RH-001",
+      "nome": "Equipe de Gestão de RH",
+      "cargo": "Coordenação de Recursos Humanos",
+      "login": "rh@katoennatie.com",
+      "email": "rh@katoennatie.com",
+      "senha": "rh123",
+      "codigoRecuperacao": "KATOEN-RH-2026",
+      "criadoEm": "2026-09-01T00:00:00.000Z",
+      "ativo": true
+    },
+    {
+      "id": "rh-2",
+      "matricula": "RH-002",
+      "nome": "Administrador RH",
+      "cargo": "Administração de Sistemas de RH",
+      "login": "rh.admin",
+      "email": "rh.admin@katoennatie.com",
+      "senha": "rh123",
+      "codigoRecuperacao": "KATOEN-RH-2026",
+      "criadoEm": "2026-09-01T00:00:00.000Z",
+      "ativo": true
+    }
+  ]
+}

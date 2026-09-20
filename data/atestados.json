@@ -1,0 +1,197 @@
+[
+  {
+    "id": "ate_7ab11eb2-3412-4192-bfe0-70a8705217e2",
+    "protocolo": "ATE-20260918-8258",
+    "nomeCompleto": "Maria Madalena da silva",
+    "matricula": "152025",
+    "setor": "Administrativo",
+    "dataInicio": "2026-09-18",
+    "dataTermino": "2026-09-20",
+    "quantidadeDias": 3,
+    "tipoDocumento": "Atestado médico",
+    "observacoes": "",
+    "nomeArquivo": "140526450875307778.jpg",
+    "tamanhoArquivo": 4419,
+    "tipoMimeArquivo": "image/jpeg",
+    "caminhoArquivo": "seed_atestado_1.png",
+    "temArquivo": true,
+    "dataHoraEnvio": "2026-09-18T14:25:13.649Z",
+    "status": "Aprovado",
+    "historicoStatus": [
+      {
+        "status": "Recebido",
+        "dataHora": "2026-09-18T14:25:13.649Z"
+      },
+      {
+        "status": "Aprovado",
+        "dataHora": "2026-09-18T14:28:06.468Z",
+        "alteradoPor": "RH"
+      }
+    ],
+    "parecerRH": ""
+  },
+  {
+    "id": "ate_029db7b1-3037-41fe-ba56-809b88b559d3",
+    "protocolo": "ATE-20260918-8105",
+    "nomeCompleto": "Beatriz Albuquerque",
+    "matricula": "MAT-8841",
+    "setor": "Outro",
+    "dataInicio": "2026-09-19",
+    "dataTermino": "2026-09-20",
+    "quantidadeDias": 2,
+    "tipoDocumento": "Atestado médico",
+    "observacoes": "Consulta de urgência oftalmológica",
+    "nomeArquivo": "atestado_olhos.png",
+    "tamanhoArquivo": 70,
+    "tipoMimeArquivo": "image/png",
+    "caminhoArquivo": "ate_029db7b1-3037-41fe-ba56-809b88b559d3_atestado_olhos.png",
+    "temArquivo": true,
+    "dataHoraEnvio": "2026-09-18T13:49:32.879Z",
+    "status": "Aprovado",
+    "historicoStatus": [
+      {
+        "status": "Recebido",
+        "dataHora": "2026-09-18T13:49:32.879Z"
+      },
+      {
+        "status": "Aprovado",
+        "dataHora": "2026-09-18T13:49:36.628Z",
+        "parecer": "CRM verificado junto ao CFM. Atestado abonado.",
+        "alteradoPor": "RH"
+      }
+    ],
+    "parecerRH": "CRM verificado junto ao CFM. Atestado abonado."
+  },
+  {
+    "id": "at-seed-001",
+    "protocolo": "ATE-20260915-4812",
+    "nomeCompleto": "Carlos Eduardo Santos",
+    "matricula": "MAT-10482",
+    "setor": "Ensaque",
+    "dataInicio": "2026-09-15",
+    "dataTermino": "2026-09-17",
+    "quantidadeDias": 3,
+    "tipoDocumento": "Atestado médico",
+    "observacoes": "Sintomas gripais fortes e recomendação médica de repouso.",
+    "nomeArquivo": "atestado_carlos_santos.png",
+    "tamanhoArquivo": 248500,
+    "tipoMimeArquivo": "image/png",
+    "caminhoArquivo": "seed_atestado_1.png",
+    "temArquivo": true,
+    "dataHoraEnvio": "2026-09-15T08:32:00.000Z",
+    "status": "Aprovado",
+    "parecerRH": "Atestado validado com CRM legível. Lançado no ponto.",
+    "historicoStatus": [
+      {
+        "status": "Recebido",
+        "dataHora": "2026-09-15T08:32:00.000Z"
+      },
+      {
+        "status": "Em análise",
+        "dataHora": "2026-09-15T09:10:00.000Z",
+        "alteradoPor": "RH"
+      },
+      {
+        "status": "Aprovado",
+        "dataHora": "2026-09-15T11:00:00.000Z",
+        "parecer": "Atestado validado com CRM legível. Lançado no ponto.",
+        "alteradoPor": "RH"
+      }
+    ]
+  },
+  {
+    "id": "at-seed-002",
+    "protocolo": "ATE-20260916-8391",
+    "nomeCompleto": "Juliana Oliveira Costa",
+    "matricula": "MAT-12903",
+    "setor": "Administrativo",
+    "dataInicio": "2026-09-16",
+    "dataTermino": "2026-09-16",
+    "quantidadeDias": 1,
+    "tipoDocumento": "Declaração",
+    "observacoes": "Declaração de comparecimento para exames laboratoriais periódicos.",
+    "nomeArquivo": "declaracao_exames_juliana.png",
+    "tamanhoArquivo": 312000,
+    "tipoMimeArquivo": "image/png",
+    "caminhoArquivo": "seed_atestado_2.png",
+    "temArquivo": true,
+    "dataHoraEnvio": "2026-09-16T14:15:00.000Z",
+    "status": "Em análise",
+    "parecerRH": "Verificando período de horas informado.",
+    "historicoStatus": [
+      {
+        "status": "Recebido",
+        "dataHora": "2026-09-16T14:15:00.000Z"
+      },
+      {
+        "status": "Em análise",
+        "dataHora": "2026-09-16T15:20:00.000Z",
+        "parecer": "Verificando período de horas informado.",
+        "alteradoPor": "RH"
+      }
+    ]
+  },
+  {
+    "id": "at-seed-003",
+    "protocolo": "ATE-20260917-2194",
+    "nomeCompleto": "Marcos Vinicius Pereira",
+    "matricula": "MAT-09831",
+    "setor": "Expedição",
+    "dataInicio": "2026-09-17",
+    "dataTermino": "2026-09-18",
+    "quantidadeDias": 2,
+    "tipoDocumento": "Atestado médico",
+    "observacoes": "Entorse leve no tornozelo durante atividade esportiva no fim de semana.",
+    "nomeArquivo": "atestado_marcos_entorse.pdf",
+    "tamanhoArquivo": 420000,
+    "tipoMimeArquivo": "application/pdf",
+    "caminhoArquivo": "seed_atestado_1.png",
+    "temArquivo": true,
+    "dataHoraEnvio": "2026-09-17T10:45:00.000Z",
+    "status": "Pendente",
+    "parecerRH": "Solicitado envio de foto com carimbo médico mais nítido.",
+    "historicoStatus": [
+      {
+        "status": "Recebido",
+        "dataHora": "2026-09-17T10:45:00.000Z"
+      },
+      {
+        "status": "Pendente",
+        "dataHora": "2026-09-17T11:30:00.000Z",
+        "parecer": "Solicitado envio de foto com carimbo médico mais nítido.",
+        "alteradoPor": "RH"
+      }
+    ]
+  },
+  {
+    "id": "at-seed-004",
+    "protocolo": "ATE-20260918-6725",
+    "nomeCompleto": "Fernanda Rocha Lima",
+    "matricula": "MAT-14120",
+    "setor": "Manutenção",
+    "dataInicio": "2026-09-18",
+    "dataTermino": "2026-09-22",
+    "quantidadeDias": 5,
+    "tipoDocumento": "Atestado médico",
+    "observacoes": "Procedimento cirúrgico odontológico e repouso de 5 dias.",
+    "nomeArquivo": "atestado_odontologico_fernanda.png",
+    "tamanhoArquivo": 524000,
+    "tipoMimeArquivo": "image/png",
+    "caminhoArquivo": "seed_atestado_2.png",
+    "temArquivo": true,
+    "dataHoraEnvio": "2026-09-18T07:10:00.000Z",
+    "status": "Aprovado",
+    "historicoStatus": [
+      {
+        "status": "Recebido",
+        "dataHora": "2026-09-18T07:10:00.000Z"
+      },
+      {
+        "status": "Aprovado",
+        "dataHora": "2026-09-18T13:55:24.764Z",
+        "alteradoPor": "RH"
+      }
+    ],
+    "parecerRH": ""
+  }
+]
