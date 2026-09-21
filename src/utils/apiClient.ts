@@ -31,8 +31,26 @@ function getFallbackColaboradores() {
 function getFallbackRH(): MembroRH[] {
   try {
     const raw = localStorage.getItem(STORAGE_RH);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed: MembroRH[] = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        let needsUpdate = false;
+        parsed.forEach(m => {
+          if (!m.senha) {
+            m.senha = 'rh123';
+            needsUpdate = true;
+          }
+        });
+        if (needsUpdate) {
+          try {
+            localStorage.setItem(STORAGE_RH, JSON.stringify(parsed));
+          } catch {}
+        }
+        return parsed;
+      }
+    }
   } catch {}
+
   const initial: MembroRH[] = [
     {
       id: 'rh-1',
@@ -41,6 +59,7 @@ function getFallbackRH(): MembroRH[] {
       cargo: 'Coordenação de Recursos Humanos',
       login: 'rh@katoennatie.com',
       email: 'rh@katoennatie.com',
+      senha: 'rh123',
       criadoEm: '2026-09-01T00:00:00.000Z',
       ativo: true,
       perfil: 'Equipe de Gestão de RH'
@@ -52,14 +71,18 @@ function getFallbackRH(): MembroRH[] {
       cargo: 'Administração de Sistemas de RH',
       login: 'rh.admin',
       email: 'rh.admin@katoennatie.com',
+      senha: 'rh123',
       criadoEm: '2026-09-01T00:00:00.000Z',
       ativo: true,
       perfil: 'Integrante da Equipe'
     }
   ];
+
   try {
     localStorage.setItem(STORAGE_RH, JSON.stringify(initial));
+    localStorage.removeItem('katoen_db_rh_senhas');
   } catch {}
+
   return initial;
 }
 
@@ -281,71 +304,154 @@ export const api = {
 
   // 4. Login RH
   async loginRH(login: string, senha: string): Promise<RHUser> {
+    const cleanLogin = login.trim();
+    const cleanSenha = senha.trim();
+
     try {
       const res = await fetch('/api/auth/login-rh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login: login.trim(), senha })
+        body: JSON.stringify({ login: cleanLogin, senha: cleanSenha })
       });
       if (isJsonResponse(res)) {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Erro ao realizar login do RH.');
-        return data.usuarioRH;
+        if (!res.ok) {
+          throw new Error(data.error || 'Erro ao realizar login do RH.');
+        }
+        const user = data.user || data.usuarioRH;
+        if (!user) {
+          throw new Error('Dados do usuário não retornados pelo servidor.');
+        }
+        try {
+          localStorage.setItem('katoen_rh_sessao', JSON.stringify(user));
+        } catch {}
+        return user;
       }
     } catch (err: any) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('JSON')) {
+      // Repassa erros de validação de credenciais do servidor (ex: 401 Senha incorreta) imediatamente
+      if (
+        err.message &&
+        !err.message.includes('fetch') &&
+        !err.message.includes('JSON') &&
+        !err.message.includes('Failed to fetch') &&
+        !err.message.includes('NetworkError')
+      ) {
         throw err;
       }
     }
 
-    // Fallback: LocalStorage
+    // Fallback: LocalStorage (apenas quando backend não responder)
     const rhList = getFallbackRH();
-    const cleanLogin = login.trim().toLowerCase();
+    const cleanLower = cleanLogin.toLowerCase();
     const membro = rhList.find(
       (m: any) =>
-        m.login.toLowerCase() === cleanLogin ||
-        m.email.toLowerCase() === cleanLogin ||
-        m.matricula.toLowerCase() === cleanLogin
+        (m.login && m.login.toLowerCase() === cleanLower) ||
+        (m.email && m.email.toLowerCase() === cleanLower) ||
+        (m.matricula && m.matricula.toLowerCase() === cleanLower)
     );
     if (!membro) {
       throw new Error('Usuário de RH não encontrado.');
     }
-    if (senha !== 'rh123') {
-      throw new Error('Senha incorreta.');
+    if (membro.ativo === false) {
+      throw new Error('Acesso desativado. Este integrante da Equipe de Gestão de RH está inativo.');
     }
-    return {
+
+    const senhaCadastrada = membro.senha !== undefined && membro.senha !== null ? membro.senha : 'rh123';
+    if (senhaCadastrada !== cleanSenha) {
+      throw new Error('Senha de RH incorreta. Verifique suas credenciais.');
+    }
+
+    const user: RHUser = {
       id: membro.id,
       login: membro.login,
       nome: membro.nome,
       matricula: membro.matricula,
-      cargo: membro.cargo,
-      email: membro.email,
-      role: 'rh'
+      cargo: membro.cargo || 'Gestão de Recursos Humanos',
+      email: membro.email || membro.login,
+      role: 'rh',
+      perfil: membro.perfil || (membro.matricula === 'RH-001' ? 'Equipe de Gestão de RH' : 'Integrante da Equipe')
     };
+
+    try {
+      localStorage.setItem('katoen_rh_sessao', JSON.stringify(user));
+    } catch {}
+
+    return user;
   },
 
   // 5. Esqueci Senha RH
   async esqueciSenhaRH(login: string, codigoRecuperacao: string, novaSenha: string): Promise<string> {
+    const cleanLogin = login.trim();
+    const cleanCod = codigoRecuperacao.trim();
+    const cleanNova = novaSenha.trim();
+
     try {
       const res = await fetch('/api/auth/esqueci-senha-rh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login, codigoRecuperacao, novaSenha })
+        body: JSON.stringify({ login: cleanLogin, codigoRecuperacao: cleanCod, novaSenha: cleanNova })
       });
       if (isJsonResponse(res)) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Erro ao redefinir senha do RH.');
+
+        // Sincronizar fallback local
+        try {
+          const rhList = getFallbackRH();
+          const cleanLower = cleanLogin.toLowerCase();
+          const idx = rhList.findIndex(
+            m =>
+              (m.login && m.login.toLowerCase() === cleanLower) ||
+              (m.email && m.email.toLowerCase() === cleanLower) ||
+              (m.matricula && m.matricula.toLowerCase() === cleanLower)
+          );
+          if (idx !== -1) {
+            rhList[idx].senha = cleanNova;
+            rhList[idx].senhaAlteradaEm = new Date().toISOString();
+            rhList[idx].senhaAlteradaPor = 'Recuperação de senha';
+            localStorage.setItem(STORAGE_RH, JSON.stringify(rhList));
+          }
+          localStorage.removeItem('katoen_db_rh_senhas');
+        } catch {}
+
         return data.message || 'Senha alterada com sucesso!';
       }
     } catch (err: any) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('JSON')) {
+      if (
+        err.message &&
+        !err.message.includes('fetch') &&
+        !err.message.includes('JSON') &&
+        !err.message.includes('Failed to fetch') &&
+        !err.message.includes('NetworkError')
+      ) {
         throw err;
       }
     }
 
-    if (codigoRecuperacao !== 'KATOEN-RH-2026') {
-      throw new Error('Código de segurança do RH inválido.');
+    if (cleanCod !== 'KATOEN-RH-2026' && cleanCod !== 'RH2026') {
+      throw new Error('Código de segurança institucional do RH inválido.');
     }
+
+    const rhList = getFallbackRH();
+    const cleanLower = cleanLogin.toLowerCase();
+    const idx = rhList.findIndex(
+      m =>
+        (m.login && m.login.toLowerCase() === cleanLower) ||
+        (m.email && m.email.toLowerCase() === cleanLower) ||
+        (m.matricula && m.matricula.toLowerCase() === cleanLower)
+    );
+    if (idx === -1) {
+      throw new Error('Integrante da Equipe de RH não encontrado.');
+    }
+
+    rhList[idx].senha = cleanNova;
+    rhList[idx].senhaAlteradaEm = new Date().toISOString();
+    rhList[idx].senhaAlteradaPor = 'Recuperação institucional';
+    try {
+      localStorage.setItem(STORAGE_RH, JSON.stringify(rhList));
+      localStorage.removeItem('katoen_db_rh_senhas');
+    } catch {}
+
     return 'Senha alterada com sucesso! Você já pode realizar o login com a nova senha.';
   },
 
@@ -601,7 +707,12 @@ export const api = {
     if (isEdit) {
       const idx = rhList.findIndex(m => m.id === membro.id);
       if (idx !== -1) {
-        rhList[idx] = { ...rhList[idx], ...membro } as MembroRH;
+        const senhaAntiga = rhList[idx].senha || 'rh123';
+        rhList[idx] = {
+          ...rhList[idx],
+          ...membro,
+          senha: membro.senha && membro.senha.trim().length >= 3 ? membro.senha.trim() : senhaAntiga
+        } as MembroRH;
       }
     } else {
       const novo: MembroRH = {
@@ -611,6 +722,7 @@ export const api = {
         cargo: membro.cargo || 'Gestão de RH',
         login: membro.login || '',
         email: membro.email || membro.login || '',
+        senha: membro.senha && membro.senha.trim().length >= 3 ? membro.senha.trim() : 'rh123',
         criadoEm: new Date().toISOString(),
         ativo: membro.ativo !== false,
         perfil: membro.perfil || 'Integrante da Equipe'
@@ -619,6 +731,7 @@ export const api = {
     }
     try {
       localStorage.setItem(STORAGE_RH, JSON.stringify(rhList));
+      localStorage.removeItem('katoen_db_rh_senhas');
     } catch {}
     return { success: true };
   },
@@ -629,6 +742,9 @@ export const api = {
     senhaAtual?: string;
     novaSenha: string;
   }): Promise<{ success: boolean; message: string; registro?: any }> {
+    const cleanNovaSenha = params.novaSenha.trim();
+    const cleanSenhaAtual = params.senhaAtual ? params.senhaAtual.trim() : undefined;
+
     try {
       const res = await fetch(`/api/rh/equipe/${params.id}/alterar-senha`, {
         method: 'POST',
@@ -637,33 +753,69 @@ export const api = {
           solicitanteId: params.solicitante.id,
           solicitanteLogin: params.solicitante.login,
           solicitanteMatricula: params.solicitante.matricula,
-          senhaAtual: params.senhaAtual,
-          novaSenha: params.novaSenha
+          senhaAtual: cleanSenhaAtual,
+          novaSenha: cleanNovaSenha
         })
       });
       if (isJsonResponse(res)) {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Erro ao alterar senha.');
+        if (!res.ok) {
+          throw new Error(data.error || 'Erro ao alterar senha.');
+        }
+
+        // Sincronizar também no armazenamento local para evitar qualquer inconsistência
+        try {
+          const rhList = getFallbackRH();
+          const targetIdx = rhList.findIndex(
+            m =>
+              m.id === params.id ||
+              m.matricula.toUpperCase() === String(params.id).trim().toUpperCase() ||
+              m.login.toLowerCase() === String(params.id).trim().toLowerCase()
+          );
+          if (targetIdx !== -1) {
+            rhList[targetIdx].senha = cleanNovaSenha;
+            rhList[targetIdx].senhaAlteradaEm = data.registro?.alteradoEm || new Date().toISOString();
+            rhList[targetIdx].senhaAlteradaPor = data.registro?.alteradoPor || params.solicitante.nome;
+            localStorage.setItem(STORAGE_RH, JSON.stringify(rhList));
+          }
+          localStorage.removeItem('katoen_db_rh_senhas');
+        } catch {}
+
         return data;
       }
     } catch (err: any) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('JSON')) {
+      // Repassa qualquer erro de validação ou permissão do servidor
+      if (
+        err.message &&
+        !err.message.includes('fetch') &&
+        !err.message.includes('JSON') &&
+        !err.message.includes('Failed to fetch') &&
+        !err.message.includes('NetworkError')
+      ) {
         throw err;
       }
     }
 
-    // Fallback: LocalStorage
+    // Fallback: LocalStorage (apenas se backend offline)
     const rhList = getFallbackRH();
-    const targetIdx = rhList.findIndex(m => m.id === params.id);
+    const targetIdx = rhList.findIndex(
+      m =>
+        m.id === params.id ||
+        m.matricula.toUpperCase() === String(params.id).trim().toUpperCase() ||
+        m.login.toLowerCase() === String(params.id).trim().toLowerCase()
+    );
     if (targetIdx === -1) {
-      throw new Error('Integrante de RH não encontrado.');
+      throw new Error('Integrante de RH não encontrado no armazenamento.');
     }
 
     const target = rhList[targetIdx];
+    const cleanSolLogin = params.solicitante.login ? params.solicitante.login.toLowerCase() : '';
+    const cleanSolMatricula = params.solicitante.matricula ? params.solicitante.matricula.toUpperCase() : '';
+
     const isSelf =
       (params.solicitante.id && target.id === params.solicitante.id) ||
-      (params.solicitante.login && target.login.toLowerCase() === params.solicitante.login.toLowerCase()) ||
-      (params.solicitante.matricula && target.matricula.toUpperCase() === params.solicitante.matricula.toUpperCase());
+      (cleanSolLogin && target.login.toLowerCase() === cleanSolLogin) ||
+      (cleanSolMatricula && target.matricula.toUpperCase() === cleanSolMatricula);
 
     const isGestor =
       params.solicitante.perfil === 'Equipe de Gestão de RH' ||
@@ -672,62 +824,39 @@ export const api = {
       params.solicitante.matricula?.toUpperCase() === 'RH-001';
 
     if (isSelf) {
-      if (!params.senhaAtual) {
+      if (!cleanSenhaAtual) {
         throw new Error('Por favor, informe sua senha atual para confirmação.');
       }
-      let storedPasswords: Record<string, string> = {};
-      try {
-        storedPasswords = JSON.parse(localStorage.getItem('katoen_db_rh_senhas') || '{}');
-      } catch {}
-      const expectedPassword = storedPasswords[target.id] || 'rh123';
-      if (params.senhaAtual.trim() !== expectedPassword) {
-        throw new Error('A senha atual informada está incorreta.');
+      const senhaEsperada = target.senha !== undefined && target.senha !== null ? target.senha : 'rh123';
+      if (cleanSenhaAtual !== senhaEsperada) {
+        throw new Error('A senha atual informada está incorreta. Verifique suas credenciais.');
       }
-      storedPasswords[target.id] = params.novaSenha.trim();
-      try {
-        localStorage.setItem('katoen_db_rh_senhas', JSON.stringify(storedPasswords));
-      } catch {}
-
-      target.senhaAlteradaEm = new Date().toISOString();
-      target.senhaAlteradaPor = 'Próprio usuário';
-      rhList[targetIdx] = target;
-      try {
-        localStorage.setItem(STORAGE_RH, JSON.stringify(rhList));
-      } catch {}
-
-      return {
-        success: true,
-        message: 'Sua senha foi alterada com sucesso! O novo acesso já está ativo imediatamente.',
-        registro: { alteradoEm: target.senhaAlteradaEm, alteradoPor: target.senhaAlteradaPor }
-      };
-    }
-
-    // Alterando senha de outro membro:
-    if (!isGestor) {
+    } else if (!isGestor) {
       throw new Error(
         'Permissão negada. Apenas usuários com perfil "Equipe de Gestão de RH" possuem permissão para alterar a senha de outros integrantes.'
       );
     }
 
-    let storedPasswords: Record<string, string> = {};
-    try {
-      storedPasswords = JSON.parse(localStorage.getItem('katoen_db_rh_senhas') || '{}');
-    } catch {}
-    storedPasswords[target.id] = params.novaSenha.trim();
-    try {
-      localStorage.setItem('katoen_db_rh_senhas', JSON.stringify(storedPasswords));
-    } catch {}
-
+    // Salvar a nova senha DIRETAMENTE no objeto do integrante no armazenamento
+    target.senha = cleanNovaSenha;
     target.senhaAlteradaEm = new Date().toISOString();
-    target.senhaAlteradaPor = `${params.solicitante.nome || 'Equipe de Gestão de RH'} (Equipe de Gestão de RH)`;
+    target.senhaAlteradaPor = isSelf
+      ? 'Próprio usuário'
+      : `${params.solicitante.nome || 'Equipe de Gestão de RH'} (Equipe de Gestão de RH)`;
     rhList[targetIdx] = target;
+
     try {
       localStorage.setItem(STORAGE_RH, JSON.stringify(rhList));
-    } catch {}
+      localStorage.removeItem('katoen_db_rh_senhas');
+    } catch {
+      throw new Error('Falha ao persistir a nova senha no armazenamento local.');
+    }
 
     return {
       success: true,
-      message: `A senha de ${target.nome} foi redefinida com sucesso pela Equipe de Gestão de RH! O novo acesso já está ativo imediatamente.`,
+      message: isSelf
+        ? 'Sua senha foi alterada com sucesso! O novo acesso já está ativo imediatamente.'
+        : `A senha de ${target.nome} foi redefinida com sucesso pela Equipe de Gestão de RH! O novo acesso já está ativo imediatamente.`,
       registro: { alteradoEm: target.senhaAlteradaEm, alteradoPor: target.senhaAlteradaPor }
     };
   },

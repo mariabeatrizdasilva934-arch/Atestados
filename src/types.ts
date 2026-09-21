@@ -96,6 +96,7 @@ export interface MembroRH {
   cargo: string;
   login: string;
   email: string;
+  senha?: string;
   criadoEm: string;
   ativo: boolean;
   perfil?: PerfilRH;

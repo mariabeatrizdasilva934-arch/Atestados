@@ -130,7 +130,7 @@ export function ModalGestaoEquipeRH({
     setModalSenhaAberto(true);
   };
 
-  const handleSenhaAlterada = (membroId: string, registro?: { alteradoEm?: string; alteradoPor?: string }) => {
+  const handleSenhaAlterada = async (membroId: string, registro?: { alteradoEm?: string; alteradoPor?: string }) => {
     setEquipe(prev =>
       prev.map(m =>
         m.id === membroId
@@ -142,6 +142,9 @@ export function ModalGestaoEquipeRH({
           : m
       )
     );
+    try {
+      await carregarEquipe();
+    } catch {}
     setSucessoMsg('Senha atualizada com sucesso! O acesso do integrante foi atualizado imediatamente.');
   };
 

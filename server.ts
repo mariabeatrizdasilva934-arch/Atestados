@@ -237,9 +237,19 @@ function readUsuarios(): UsersDatabase {
 
 function writeUsuarios(data: UsersDatabase): void {
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    const jsonStr = JSON.stringify(data, null, 2);
+    fs.writeFileSync(USERS_FILE, jsonStr, 'utf-8');
+    const cwdFile = path.join(process.cwd(), 'data', 'usuarios.json');
+    if (USERS_FILE !== cwdFile && fs.existsSync(path.dirname(cwdFile))) {
+      try {
+        fs.writeFileSync(cwdFile, jsonStr, 'utf-8');
+      } catch (e) {
+        console.warn('Aviso: Não foi possível espelhar usuarios.json no cwd:', e);
+      }
+    }
   } catch (err) {
-    console.error('Erro ao salvar base de usuários:', err);
+    console.error('Erro crítico ao salvar base de usuários:', err);
+    throw new Error('Falha ao persistir alterações na base de usuários.');
   }
 }
 
@@ -632,18 +642,22 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         });
       }
 
+      const userData = {
+        id: rhUser.id,
+        login: rhUser.login,
+        nome: rhUser.nome,
+        matricula: rhUser.matricula,
+        cargo: rhUser.cargo || 'Gestão de Recursos Humanos',
+        email: rhUser.email || rhUser.login,
+        role: 'rh' as const,
+        perfil: rhUser.perfil || (isGestorRH(rhUser) ? 'Equipe de Gestão de RH' : 'Integrante da Equipe')
+      };
+
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.json({
         success: true,
-        user: {
-          id: rhUser.id,
-          login: rhUser.login,
-          nome: rhUser.nome,
-          matricula: rhUser.matricula,
-          cargo: rhUser.cargo || 'Gestão de Recursos Humanos',
-          email: rhUser.email || rhUser.login,
-          role: 'rh',
-          perfil: rhUser.perfil || (isGestorRH(rhUser) ? 'Equipe de Gestão de RH' : 'Integrante da Equipe')
-        }
+        user: userData,
+        usuarioRH: userData
       });
     } catch (err) {
       console.error('Erro no login do RH:', err);
@@ -900,7 +914,12 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       }
 
       const db = readUsuarios();
-      const targetIndex = db.rh.findIndex(r => r.id === id);
+      const targetIndex = db.rh.findIndex(
+        r =>
+          r.id === id ||
+          r.matricula.toUpperCase() === String(id).trim().toUpperCase() ||
+          r.login.toLowerCase() === String(id).trim().toLowerCase()
+      );
       if (targetIndex === -1) {
         return res.status(404).json({ error: 'Integrante de RH não encontrado.' });
       }
@@ -908,16 +927,19 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       const target = db.rh[targetIndex];
 
       // Identificar o usuário solicitante da ação
+      const cleanSolLogin = solicitanteLogin ? String(solicitanteLogin).trim().toLowerCase() : '';
+      const cleanSolMatricula = solicitanteMatricula ? String(solicitanteMatricula).trim().toUpperCase() : '';
+
       const solicitante = db.rh.find(
         r =>
           (solicitanteId && r.id === solicitanteId) ||
-          (solicitanteLogin && r.login.toLowerCase() === String(solicitanteLogin).trim().toLowerCase()) ||
-          (solicitanteMatricula && r.matricula.toUpperCase() === String(solicitanteMatricula).trim().toUpperCase())
+          (cleanSolLogin && r.login.toLowerCase() === cleanSolLogin) ||
+          (cleanSolMatricula && r.matricula.toUpperCase() === cleanSolMatricula)
       );
 
       if (!solicitante) {
         return res.status(401).json({
-          error: 'Usuário solicitante não identificado. Faça login na área de RH.'
+          error: 'Usuário solicitante não identificado na base do RH. Faça login novamente.'
         });
       }
 
@@ -954,6 +976,17 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         db.rh[targetIndex] = target;
         writeUsuarios(db);
 
+        // Verificação imediata no disco para garantir persistência real
+        const checkDb = readUsuarios();
+        const checkUser = checkDb.rh[targetIndex];
+        if (!checkUser || checkUser.senha !== novaSenha.trim()) {
+          console.error('Falha ao confirmar gravação da nova senha no disco!');
+          return res.status(500).json({
+            error: 'Erro de persistência: a nova senha não foi salva no armazenamento do sistema.'
+          });
+        }
+
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         return res.json({
           success: true,
           message: 'Sua senha foi alterada com sucesso! O novo acesso já está ativo imediatamente.',
@@ -979,6 +1012,17 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       db.rh[targetIndex] = target;
       writeUsuarios(db);
 
+      // Verificação imediata no disco para garantir persistência real
+      const checkDb = readUsuarios();
+      const checkUser = checkDb.rh[targetIndex];
+      if (!checkUser || checkUser.senha !== novaSenha.trim()) {
+        console.error('Falha ao confirmar gravação da nova senha no disco!');
+        return res.status(500).json({
+          error: 'Erro de persistência: a nova senha não foi salva no armazenamento do sistema.'
+        });
+      }
+
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       return res.json({
         success: true,
         message: `A senha de ${target.nome} foi redefinida com sucesso pela Equipe de Gestão de RH! O novo acesso já está ativo imediatamente.`,
@@ -987,9 +1031,9 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
           alteradoPor: target.senhaAlteradaPor
         }
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao alterar senha do integrante de RH:', err);
-      res.status(500).json({ error: 'Erro interno ao processar alteração de senha.' });
+      res.status(500).json({ error: err.message || 'Erro interno ao processar alteração de senha.' });
     }
   };
 
