@@ -136,28 +136,28 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 selection:bg-red-500 selection:text-white">
-      {/* Global Header */}
-      <Header
-        view={view}
-        colaborador={colaborador}
-        usuarioRH={usuarioRH}
-        onNavigateHome={() => {
-          if (view === 'rh') {
-            setView(colaborador ? 'home' : 'login');
-          } else if (colaborador) {
-            setView('home');
-          } else {
-            setView('login');
-          }
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onNavigateRH={handleAbrirRH}
-        onAbrirEquipeRH={() => setGestaoEquipeRHOpen(true)}
-        onLogout={handleLogout}
-      />
+      {/* Global Header (apenas para visão colaborador / público) */}
+      {view !== 'rh' && (
+        <Header
+          view={view}
+          colaborador={colaborador}
+          usuarioRH={usuarioRH}
+          onNavigateHome={() => {
+            if (colaborador) {
+              setView('home');
+            } else {
+              setView('login');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateRH={handleAbrirRH}
+          onAbrirEquipeRH={() => setGestaoEquipeRHOpen(true)}
+          onLogout={handleLogout}
+        />
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col">
         {/* Tela 1: LOGIN DO COLABORADOR */}
         {view === 'login' && (
           <LoginColaborador
@@ -202,36 +202,43 @@ export default function App() {
             onAlterarStatus={item => setStatusAtestadoModal(item)}
             onAbrirEquipeRH={() => setGestaoEquipeRHOpen(true)}
             usuarioRH={usuarioRH}
+            onVoltarColaborador={() => {
+              setView(colaborador ? 'home' : 'login');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onLogout={handleLogout}
           />
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 mt-auto py-8 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-700">
-          <div className="flex items-center gap-3">
-            <img
-              src="/katoen-natie.png"
-              alt="Katoen Natie"
-              className="h-7 w-auto object-contain"
-              referrerPolicy="no-referrer"
-            />
-          </div>
+      {/* Footer (apenas para visão colaborador / público) */}
+      {view !== 'rh' && (
+        <footer className="bg-white border-t border-slate-200 mt-auto py-8 px-4 sm:px-6">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-700">
+            <div className="flex items-center gap-3">
+              <img
+                src="/katoen-natie.png"
+                alt="Katoen Natie"
+                className="h-7 w-auto object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
 
-          <div className="flex items-center gap-4">
-            <span>Privacidade e Segurança de Dados em conformidade com LGPD</span>
-            {view !== 'rh' && view !== 'login' && (
-              <button
-                id="btn-footer-acesso-rh"
-                onClick={handleAbrirRH}
-                className="text-slate-700 hover:text-red-700 font-medium transition-colors cursor-pointer"
-              >
-                Acesso do RH
-              </button>
-            )}
+            <div className="flex items-center gap-4">
+              <span>Privacidade e Segurança de Dados em conformidade com LGPD</span>
+              {view !== 'login' && (
+                <button
+                  id="btn-footer-acesso-rh"
+                  onClick={handleAbrirRH}
+                  className="text-slate-700 hover:text-red-700 font-medium transition-colors cursor-pointer"
+                >
+                  Acesso do RH
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Modal: Login do RH */}
       <LoginRHModal
