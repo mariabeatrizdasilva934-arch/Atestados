@@ -17,7 +17,11 @@ export default function App() {
   const [colaborador, setColaborador] = useState<ColaboradorUser | null>(() => {
     try {
       const saved = localStorage.getItem('katoen_colaborador_sessao');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.matricula) return parsed;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -26,7 +30,11 @@ export default function App() {
   const [usuarioRH, setUsuarioRH] = useState<RHUser | null>(() => {
     try {
       const saved = localStorage.getItem('katoen_rh_sessao');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.id || parsed.login)) return parsed;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -79,13 +87,27 @@ export default function App() {
 
   // Auth Handlers
   const handleLoginColaboradorSucesso = (user: ColaboradorUser) => {
+    if (!user || !user.matricula) {
+      console.warn('Tentativa de login com objeto de usuário inválido:', user);
+      return;
+    }
     setColaborador(user);
+    try {
+      localStorage.setItem('katoen_colaborador_sessao', JSON.stringify(user));
+    } catch {}
     setView('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleLoginRHSucesso = (user: RHUser) => {
+    if (!user || (!user.id && !user.login)) {
+      console.warn('Tentativa de login de RH com objeto inválido:', user);
+      return;
+    }
     setUsuarioRH(user);
+    try {
+      localStorage.setItem('katoen_rh_sessao', JSON.stringify(user));
+    } catch {}
     setLoginRHOpen(false);
     setView('rh');
     window.scrollTo({ top: 0, behavior: 'smooth' });

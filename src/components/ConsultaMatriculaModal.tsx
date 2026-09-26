@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, X, Loader2, AlertCircle, Calendar, Hash, FileText, CheckCircle2, MessageSquare, Clock } from 'lucide-react';
 import { ConsultaMatriculaItem } from '../types';
 import { formatarData, formatarDataHora, getStatusColor } from '../utils/formatters';
@@ -15,6 +15,12 @@ export function ConsultaMatriculaModal({ isOpen, onClose, matriculaInicial }: Co
   const [loading, setLoading] = useState(false);
   const [resultados, setResultados] = useState<ConsultaMatriculaItem[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen && matriculaInicial) {
+      setMatriculaInput(matriculaInicial);
+    }
+  }, [isOpen, matriculaInicial]);
 
   if (!isOpen) return null;
 

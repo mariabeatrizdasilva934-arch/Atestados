@@ -457,10 +457,13 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       }
 
       const cleanMatricula = matricula.trim().toUpperCase();
+      const cleanSenha = senha.trim();
       const db = readUsuarios();
 
       // Check if trying to use RH login here
-      const isRHLogin = db.rh.some(r => r.login.toLowerCase() === cleanMatricula.toLowerCase());
+      const isRHLogin = db.rh.some(
+        r => r.login && r.login.trim().toLowerCase() === cleanMatricula.toLowerCase()
+      );
       if (isRHLogin) {
         return res.status(400).json({
           error: 'Credencial do RH detectada. Acesse o sistema pelo botão "Área do RH".'
@@ -468,7 +471,7 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       }
 
       const colaborador = db.colaboradores.find(
-        c => c.matricula.toUpperCase() === cleanMatricula
+        c => c.matricula && c.matricula.trim().toUpperCase() === cleanMatricula
       );
 
       if (!colaborador) {
@@ -477,20 +480,24 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         });
       }
 
-      if (colaborador.senha !== senha.trim()) {
+      if (String(colaborador.senha).trim() !== cleanSenha) {
         return res.status(401).json({
           error: 'Senha incorreta. Verifique os dados digitados ou utilize "Esqueci minha senha".'
         });
       }
 
+      const userData = {
+        matricula: colaborador.matricula.trim().toUpperCase(),
+        nomeCompleto: colaborador.nomeCompleto.trim(),
+        setor: colaborador.setor.trim(),
+        role: 'colaborador' as const
+      };
+
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.json({
         success: true,
-        user: {
-          matricula: colaborador.matricula,
-          nomeCompleto: colaborador.nomeCompleto,
-          setor: colaborador.setor,
-          role: 'colaborador'
-        }
+        user: userData,
+        colaborador: userData
       });
     } catch (err) {
       console.error('Erro no login do colaborador:', err);
@@ -517,10 +524,11 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       }
 
       const cleanMatricula = matricula.trim().toUpperCase();
+      const cleanSenha = senha.trim();
       const db = readUsuarios();
 
       const existe = db.colaboradores.find(
-        c => c.matricula.toUpperCase() === cleanMatricula
+        c => c.matricula && c.matricula.trim().toUpperCase() === cleanMatricula
       );
 
       if (existe) {
@@ -533,22 +541,26 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         matricula: cleanMatricula,
         nomeCompleto: nomeCompleto.trim(),
         setor: setor.trim(),
-        senha: senha.trim(),
+        senha: cleanSenha,
         criadoEm: new Date().toISOString()
       };
 
       db.colaboradores.push(novoColaborador);
       writeUsuarios(db);
 
+      const userData = {
+        matricula: novoColaborador.matricula,
+        nomeCompleto: novoColaborador.nomeCompleto,
+        setor: novoColaborador.setor,
+        role: 'colaborador' as const
+      };
+
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.status(201).json({
         success: true,
         message: 'Acesso criado com sucesso!',
-        user: {
-          matricula: novoColaborador.matricula,
-          nomeCompleto: novoColaborador.nomeCompleto,
-          setor: novoColaborador.setor,
-          role: 'colaborador'
-        }
+        user: userData,
+        colaborador: userData
       });
     } catch (err) {
       console.error('Erro ao cadastrar colaborador:', err);
@@ -559,7 +571,7 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
   // API: Auth - Esqueci Senha Colaborador
   app.post('/api/auth/esqueci-senha-colaborador', (req, res) => {
     try {
-      const { matricula, novaSenha, confirmacao } = req.body;
+      const { matricula, novaSenha } = req.body;
       if (!matricula || !matricula.trim()) {
         return res.status(400).json({ error: 'Informe sua matrícula.' });
       }
@@ -568,9 +580,10 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       }
 
       const cleanMatricula = matricula.trim().toUpperCase();
+      const cleanNovaSenha = novaSenha.trim();
       const db = readUsuarios();
       const index = db.colaboradores.findIndex(
-        c => c.matricula.toUpperCase() === cleanMatricula
+        c => c.matricula && c.matricula.trim().toUpperCase() === cleanMatricula
       );
 
       if (index === -1) {
@@ -579,9 +592,10 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         });
       }
 
-      db.colaboradores[index].senha = novaSenha.trim();
+      db.colaboradores[index].senha = cleanNovaSenha;
       writeUsuarios(db);
 
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.json({
         success: true,
         message: 'Senha atualizada com sucesso! Você já pode fazer login.'
@@ -604,20 +618,21 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
       }
 
       const cleanInput = login.trim().toLowerCase();
+      const cleanSenha = senha.trim();
       const db = readUsuarios();
 
       // Check if user exists in the RH team by login, matricula, or email
       const rhUser = db.rh.find(
         r =>
-          (r.login && r.login.toLowerCase() === cleanInput) ||
-          (r.matricula && r.matricula.toLowerCase() === cleanInput) ||
-          (r.email && r.email.toLowerCase() === cleanInput)
+          (r.login && r.login.trim().toLowerCase() === cleanInput) ||
+          (r.matricula && r.matricula.trim().toLowerCase() === cleanInput) ||
+          (r.email && r.email.trim().toLowerCase() === cleanInput)
       );
 
       if (!rhUser) {
         // If not in RH, check if it is a common employee without RH permissions
         const isColaborador = db.colaboradores.some(
-          c => c.matricula.toUpperCase() === cleanInput.toUpperCase()
+          c => c.matricula && c.matricula.trim().toUpperCase() === cleanInput.toUpperCase()
         );
         if (isColaborador) {
           return res.status(403).json({
@@ -636,7 +651,7 @@ app.use(express.urlencoded({ limit: '35mb', extended: true }));
         });
       }
 
-      if (rhUser.senha !== senha.trim()) {
+      if (String(rhUser.senha).trim() !== cleanSenha) {
         return res.status(401).json({
           error: 'Senha de RH incorreta. Verifique suas credenciais.'
         });

@@ -20,7 +20,9 @@ function getFallbackColaboradores() {
     { matricula: 'MAT-10482', nomeCompleto: 'Carlos Eduardo Santos', setor: 'Ensaque', senha: '123' },
     { matricula: 'MAT-12903', nomeCompleto: 'Juliana Oliveira Costa', setor: 'Administrativo', senha: '123' },
     { matricula: 'MAT-09831', nomeCompleto: 'Marcos Vinicius Pereira', setor: 'Expedição', senha: '123' },
-    { matricula: 'MAT-14120', nomeCompleto: 'Fernanda Rocha Lima', setor: 'Manutenção', senha: '123' }
+    { matricula: 'MAT-14120', nomeCompleto: 'Fernanda Rocha Lima', setor: 'Manutenção', senha: '123' },
+    { matricula: 'MAT-20001', nomeCompleto: 'Roberto Albuquerque', setor: 'Manutenção', senha: '321' },
+    { matricula: '10109960', nomeCompleto: 'maria beatriz', setor: 'Administrativo', senha: '152025' }
   ];
   try {
     localStorage.setItem(STORAGE_COLABORADORES, JSON.stringify(initial));
@@ -194,108 +196,183 @@ function getFallbackAtestados(): Atestado[] {
 export const api = {
   // 1. Login Colaborador
   async loginColaborador(matricula: string, senha: string): Promise<ColaboradorUser> {
+    const cleanMatricula = matricula.trim();
+    const cleanSenha = senha.trim();
+
     try {
       const res = await fetch('/api/auth/login-colaborador', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matricula: matricula.trim(), senha })
+        body: JSON.stringify({ matricula: cleanMatricula, senha: cleanSenha })
       });
       if (isJsonResponse(res)) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Erro ao realizar login.');
-        return data.colaborador;
+        const user: ColaboradorUser = data.user || data.colaborador;
+        if (!user || !user.matricula) {
+          throw new Error('Dados do colaborador não foram retornados corretamente pelo servidor.');
+        }
+        try {
+          localStorage.setItem('katoen_colaborador_sessao', JSON.stringify(user));
+        } catch {}
+        return user;
       }
     } catch (err: any) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('JSON')) {
+      if (
+        err.message &&
+        !err.message.includes('fetch') &&
+        !err.message.includes('JSON') &&
+        !err.message.includes('Failed to fetch') &&
+        !err.message.includes('NetworkError')
+      ) {
         throw err;
       }
     }
 
     // Fallback: LocalStorage
     const users = getFallbackColaboradores();
-    const user = users.find((u: any) => u.matricula.toLowerCase() === matricula.trim().toLowerCase());
+    const user = users.find((u: any) => u.matricula && u.matricula.trim().toUpperCase() === cleanMatricula.toUpperCase());
     if (!user) {
       throw new Error(`Matrícula "${matricula}" não cadastrada no sistema.`);
     }
-    if (user.senha && user.senha !== senha) {
-      throw new Error('Senha incorreta.');
+    if (String(user.senha).trim() !== cleanSenha) {
+      throw new Error('Senha incorreta. Verifique os dados digitados ou utilize "Esqueci minha senha".');
     }
-    return {
+    const loggedUser: ColaboradorUser = {
       matricula: user.matricula,
       nomeCompleto: user.nomeCompleto,
       setor: user.setor,
       role: 'colaborador'
     };
+    try {
+      localStorage.setItem('katoen_colaborador_sessao', JSON.stringify(loggedUser));
+    } catch {}
+    return loggedUser;
   },
 
   // 2. Cadastro Colaborador
   async cadastroColaborador(dados: { matricula: string; nomeCompleto: string; setor: string; senha: string }): Promise<ColaboradorUser> {
+    const cleanData = {
+      matricula: dados.matricula.trim().toUpperCase(),
+      nomeCompleto: dados.nomeCompleto.trim(),
+      setor: dados.setor.trim(),
+      senha: dados.senha.trim()
+    };
+
     try {
       const res = await fetch('/api/auth/cadastro-colaborador', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dados)
+        body: JSON.stringify(cleanData)
       });
       if (isJsonResponse(res)) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Erro ao realizar cadastro.');
-        return data.colaborador;
+        const user: ColaboradorUser = data.user || data.colaborador;
+        if (!user || !user.matricula) {
+          throw new Error('Dados do colaborador não foram retornados corretamente pelo servidor.');
+        }
+        try {
+          localStorage.setItem('katoen_colaborador_sessao', JSON.stringify(user));
+        } catch {}
+        // Sincronizar fallback local se existir
+        try {
+          const users = getFallbackColaboradores();
+          if (!users.some((u: any) => u.matricula && u.matricula.trim().toUpperCase() === cleanData.matricula)) {
+            users.push({
+              matricula: cleanData.matricula,
+              nomeCompleto: cleanData.nomeCompleto,
+              setor: cleanData.setor,
+              senha: cleanData.senha
+            });
+            localStorage.setItem(STORAGE_COLABORADORES, JSON.stringify(users));
+          }
+        } catch {}
+        return user;
       }
     } catch (err: any) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('JSON')) {
+      if (
+        err.message &&
+        !err.message.includes('fetch') &&
+        !err.message.includes('JSON') &&
+        !err.message.includes('Failed to fetch') &&
+        !err.message.includes('NetworkError')
+      ) {
         throw err;
       }
     }
 
     // Fallback: LocalStorage
     const users = getFallbackColaboradores();
-    if (users.some((u: any) => u.matricula.toLowerCase() === dados.matricula.trim().toLowerCase())) {
+    if (users.some((u: any) => u.matricula && u.matricula.trim().toUpperCase() === cleanData.matricula)) {
       throw new Error('Esta matrícula já está cadastrada.');
     }
     const novo = {
-      matricula: dados.matricula.trim().toUpperCase(),
-      nomeCompleto: dados.nomeCompleto.trim(),
-      setor: dados.setor.trim(),
-      senha: dados.senha
+      matricula: cleanData.matricula,
+      nomeCompleto: cleanData.nomeCompleto,
+      setor: cleanData.setor,
+      senha: cleanData.senha
     };
     users.push(novo);
     try {
       localStorage.setItem(STORAGE_COLABORADORES, JSON.stringify(users));
     } catch {}
-    return {
+    const loggedUser: ColaboradorUser = {
       matricula: novo.matricula,
       nomeCompleto: novo.nomeCompleto,
       setor: novo.setor,
       role: 'colaborador'
     };
+    try {
+      localStorage.setItem('katoen_colaborador_sessao', JSON.stringify(loggedUser));
+    } catch {}
+    return loggedUser;
   },
 
   // 3. Esqueci Senha Colaborador
   async esqueciSenhaColaborador(matricula: string, novaSenha: string): Promise<string> {
+    const cleanMatricula = matricula.trim().toUpperCase();
+    const cleanNovaSenha = novaSenha.trim();
+
     try {
       const res = await fetch('/api/auth/esqueci-senha-colaborador', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matricula, novaSenha })
+        body: JSON.stringify({ matricula: cleanMatricula, novaSenha: cleanNovaSenha })
       });
       if (isJsonResponse(res)) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Erro ao redefinir senha.');
-        return data.message || 'Senha redefinida com sucesso!';
+        // Sincronizar fallback local se existir
+        try {
+          const users = getFallbackColaboradores();
+          const idx = users.findIndex((u: any) => u.matricula && u.matricula.trim().toUpperCase() === cleanMatricula);
+          if (idx !== -1) {
+            users[idx].senha = cleanNovaSenha;
+            localStorage.setItem(STORAGE_COLABORADORES, JSON.stringify(users));
+          }
+        } catch {}
+        return data.message || 'Senha atualizada com sucesso! Você já pode fazer login.';
       }
     } catch (err: any) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('JSON')) {
+      if (
+        err.message &&
+        !err.message.includes('fetch') &&
+        !err.message.includes('JSON') &&
+        !err.message.includes('Failed to fetch') &&
+        !err.message.includes('NetworkError')
+      ) {
         throw err;
       }
     }
 
     // Fallback: LocalStorage
     const users = getFallbackColaboradores();
-    const idx = users.findIndex((u: any) => u.matricula.toLowerCase() === matricula.trim().toLowerCase());
+    const idx = users.findIndex((u: any) => u.matricula && u.matricula.trim().toUpperCase() === cleanMatricula);
     if (idx === -1) {
       throw new Error(`Matrícula "${matricula}" não foi encontrada no sistema.`);
     }
-    users[idx].senha = novaSenha;
+    users[idx].senha = cleanNovaSenha;
     try {
       localStorage.setItem(STORAGE_COLABORADORES, JSON.stringify(users));
     } catch {}
